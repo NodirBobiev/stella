@@ -11,7 +11,7 @@ src/Stella/TestStella: Stella.cf
 	cd src/Stella/ && (bnfc -m --cpp ../../Stella.cf -l -p Stella; cd ../../)
 	cd src/Stella/ && (make; cd ../../)
 
-build/stella-interpreter: src/Interpret.cpp src/TypeCheck.cpp src/TypeCheck.h src/VisitTypeCheck.cpp src/VisitTypeCheck.h src/Eval.cpp src/Eval.h src/Stella/TestStella CMakeLists.txt
+build/stella-interpreter: src/Interpret.cpp src/TypeCheck.cpp src/TypeCheck.h src/Eval.cpp src/Eval.h src/Stella/TestStella CMakeLists.txt
 	cmake -S. -Bbuild
 	cmake --build build/ --target stella-interpreter --
 

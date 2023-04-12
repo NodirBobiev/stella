@@ -1,0 +1,14 @@
+//Ill-typed: Passing a function of three parameters to a function waiting for a function of two paramters
+
+language core;
+fn f( p1 : fn(Nat, Nat) -> Bool ) -> Nat {
+    return 5;
+}
+
+fn f1(x1 : Nat, x2 : Nat, x3 : Bool ) -> Bool{
+    return false;
+}
+
+fn main() -> Nat {
+    return f(f1);
+}

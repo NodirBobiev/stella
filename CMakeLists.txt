@@ -13,6 +13,8 @@ set (Stella_Syntax
   src/Stella/Buffer.C
   src/Stella/Bison.H
   src/Stella/Lexer.C
+  src/Stella/Skeleton.H
+  src/Stella/Skeleton.C
 )
 
 set (SRCS
@@ -21,8 +23,6 @@ set (SRCS
   src/Eval.cpp
   src/TypeCheck.h
   src/TypeCheck.cpp
-  src/VisitTypeCheck.h
-  src/VisitTypeCheck.cpp
 )
 
 add_executable(stella-interpreter ${Stella_Syntax} ${SRCS})
@@ -50,6 +50,9 @@ add_test(NAME undefined-variable-1 COMMAND stella-interpreter typecheck ../tests
 add_test(NAME undefined-variable-2 COMMAND stella-interpreter typecheck ../tests/ill-typed/undefined-variable-2.stella)
 add_test(NAME bad-squares-1 COMMAND stella-interpreter typecheck ../tests/ill-typed/bad-squares-1.stella)
 add_test(NAME bad-squares-2 COMMAND stella-interpreter typecheck ../tests/ill-typed/bad-squares-2.stella)
+add_test(NAME ill-typed-1 COMMAND stella-interpreter typecheck ../tests/ill-typed/ill-typed-1.stella)
+add_test(NAME ill-typed-2 COMMAND stella-interpreter typecheck ../tests/ill-typed/ill-typed-2.stella)
+
 set_tests_properties(
   bad-squares-1
   bad-squares-2
@@ -67,6 +70,8 @@ set_tests_properties(
   shadowed-variable-1
   undefined-variable-1
   undefined-variable-2
+  ill-typed-1
+  ill-typed-2
   PROPERTIES WILL_FAIL TRUE)
 
 add_test(NAME factorial COMMAND stella-interpreter typecheck ../tests/well-typed/factorial.stella)
@@ -74,3 +79,5 @@ add_test(NAME increment_twice COMMAND stella-interpreter typecheck ../tests/well
 add_test(NAME higher-order-1 COMMAND stella-interpreter typecheck ../tests/well-typed/higher-order-1.stella)
 add_test(NAME logical-operators COMMAND stella-interpreter typecheck ../tests/well-typed/logical-operators.stella)
 add_test(NAME squares COMMAND stella-interpreter typecheck ../tests/well-typed/squares.stella)
+add_test(NAME well-typed-1 COMMAND stella-interpreter typecheck ../tests/well-typed/well-typed-1.stella)
+add_test(NAME well-typed-2 COMMAND stella-interpreter typecheck ../tests/well-typed/well-typed-2.stella)

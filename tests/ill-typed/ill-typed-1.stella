@@ -1,0 +1,18 @@
+//Ill-typed: Passing a Bool typed variable c to function f1 accepting Nat type as the second parameter:
+
+language core;
+fn f(p1 : Nat, p2 : Bool) -> fn(Nat) -> Nat {
+    return fn(x : Nat){return 5;};
+}
+
+fn f1(x1 : Nat, x2 : Nat) -> Bool{
+    return false;
+}
+
+fn f2(y1 : Nat) -> Nat{
+    return succ(0);
+}
+
+fn main(a : Nat, b : Nat, c : Bool, d : Nat) -> Nat {
+    return f(a, f1(b, c))(f2(d));
+}
