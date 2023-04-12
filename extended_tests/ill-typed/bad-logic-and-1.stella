@@ -1,0 +1,9 @@
+language core;
+
+fn and_fn(n : Nat, m : Bool) -> Nat {
+    return n and m;
+}
+
+fn main(n : Nat) -> Nat {
+  return and_fn(n, true);
+}

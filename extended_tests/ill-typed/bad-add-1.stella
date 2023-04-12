@@ -1,0 +1,9 @@
+language core;
+
+fn add_fn(n : Nat, m : Bool) -> Nat {
+    return n + m;
+}
+
+fn main(n : Nat) -> Nat {
+  return add_fn(n, true);
+}

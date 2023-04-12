@@ -12,25 +12,39 @@ using namespace std;
 
 namespace Stella
 {
+    string toString(Type *type);
+
+    string toString(ListType *list_type){
+        string result = "";
+        for (ListType::iterator it = list_type->begin(); it != list_type->end(); it++)
+            result +=  (it == list_type->begin() ? "" : ",") + toString(*it);
+        return result;
+    }
+
     string toString(Type *type)
     {
+        static long long nullCounter = 0;
         if (type == nullptr)
-            return "NULLPTRTYPE";
+            return "NULL<" + to_string(nullCounter++) + ">";
 
-        if (auto *type_bool = dynamic_cast<TypeBool *>(type))
+        if (auto type_bool = dynamic_cast<TypeBool *>(type))
             return "Bool";
     
         if (auto type_nat = dynamic_cast<TypeNat *>(type))
             return "Nat";
         
-        if (auto type_fun = dynamic_cast<TypeFun *>(type)){
-            // example: (Nat,Bool)->(Nat)
-            string result = "(";                
-            for (ListType::iterator it = type_fun->listtype_->begin(); it != type_fun->listtype_->end(); it++)
-                result +=  (it == type_fun->listtype_->begin() ? "" : ",") + toString(*it);
-            result += ")->(" + toString(type_fun->type_) + ")";
-            return result;
-        }
+        if (auto type_unit = dynamic_cast<TypeUnit *>(type))
+            return "Unit";
+        
+        if (auto type_tuple = dynamic_cast<TypeTuple *>(type))
+            return "{" + toString(type_tuple->listtype_) + "}";
+        
+        if (auto type_fun = dynamic_cast<TypeFun *>(type))
+            return "(" + toString(type_fun->listtype_) + ")->(" + toString(type_fun->type_) + ")";
+        
+        if (auto type_sum = dynamic_cast<TypeSum *>(type))
+            return toString(type_sum->type_1) + "+" + toString(type_sum->type_2);
+
         throw invalid_argument("Type is not implemented");
     }
 
@@ -52,30 +66,7 @@ namespace Stella
 
     bool typecheck(Type *type1, Type *type2)
     {
-        auto type1_bool = dynamic_cast<TypeBool *>(type1);
-        auto type2_bool = dynamic_cast<TypeBool *>(type2);
-        if (type1_bool != nullptr && type2_bool != nullptr)
-            return true;
-
-        auto type1_nat = dynamic_cast<TypeNat *>(type1);
-        auto type2_nat = dynamic_cast<TypeNat *>(type2);
-        if (type1_nat != nullptr && type2_nat != nullptr)
-            return true;
-
-        auto type1_fun = dynamic_cast<TypeFun*>(type1);
-        auto type2_fun = dynamic_cast<TypeFun*>(type2);
-        if (type1_fun != nullptr && type2_fun != nullptr){
-            auto list_type1 = type1_fun->listtype_;
-            auto list_type2 = type2_fun->listtype_;
-            if( list_type1->size() != list_type2->size() )
-                return false;
-            for(int i = 0; i < list_type1->size(); i ++)
-                if( !typecheck((*list_type1)[i], (*list_type2)[i]))
-                    return false;
-            
-            return typecheck(type1_fun->type_, type2_fun->type_);
-        }
-        return false;
+        return toString(type1) == toString(type2);
     }
 
     string colorize(string text, int code)
@@ -144,7 +135,7 @@ namespace Stella
 
         void logMessage(string text)
         {
-            // cout << beautify(text, this->visitDepth) << endl;
+            cout << beautify(text, this->visitDepth) << endl;
             message_outputs += beautify(text, this->visitDepth) + "\n";
         }
 
@@ -238,6 +229,14 @@ namespace Stella
             exitVisit();
         }
 
+        void visitConstUnit(ConstUnit *const_unit)
+        {
+            enterVisit();
+            logMessage("visitConstUnit; expected_type: " + toString(expected_type));
+            set_actual_type(const_unit, new TypeUnit());
+            exitVisit();
+        }
+
         void visitVar(Var *var)
         {
             enterVisit();
@@ -248,15 +247,88 @@ namespace Stella
             exitVisit();
         }
 
+        void visitTuple(Tuple *tuple)
+        {
+            enterVisit();
+            logMessage("vistTuple; expected_tuple: " + toString(expected_type));
+            auto list_type = new ListType();
+            auto list_expr = tuple->listexpr_;
+            for(ListExpr::iterator it = list_expr->begin(); it != list_expr->end(); it ++)
+                list_type->push_back(typecheck_subexpr(*it, nullptr));
+
+            set_actual_type(tuple, new TypeTuple(list_type));
+            exitVisit();
+        }
+
+        void visitDotTuple(DotTuple *dot_tuple)
+        {
+            enterVisit();
+            logMessage("visitDotTuple; expected_tuple: " + toString(expected_type));
+            auto expr = dot_tuple->expr_;
+            auto expr_type = typecheck_subexpr(dot_tuple->expr_, nullptr);
+            if(auto type_tuple = dynamic_cast<TypeTuple *>(expr_type)){
+                auto list_type = type_tuple->listtype_;
+                if(list_type->size() < dot_tuple->integer_)
+                    throw TypeError(
+                        "Tuple has only " + to_string(list_type->size()) + " fields but " + to_string(dot_tuple->integer_) + "th is accessed",
+                        dot_tuple->line_number, dot_tuple->char_number);
+                set_actual_type(dot_tuple, list_type->at(dot_tuple->integer_ - 1));
+            }
+            else{
+                throw TypeError(
+                    "Expected Tuple type but got " + toString(expr_type) + " type", expr->line_number, expr->char_number
+                );
+            }
+            exitVisit();
+        }
+
+        void visitInl(Inl *inl)
+        {
+            enterVisit();
+            logMessage("visitInl; exptected_type: " + toString(expected_type));
+
+
+            exitVisit();
+        }
+
+        void visitInr(Inr *inr)
+        {
+            enterVisit();
+            logMessage("visitInr; expected_type: " + toString(expected_type));
+
+            exitVisit();
+        }
+
+        void visitMatch(Match *match)
+        {
+            enterVisit();
+            logMessage("visitMatch; expected_type: " + toString(expected_type));
+            typecheck_subexpr(match->expr_, nullptr);
+            auto list_case = match->listmatchcase_;
+
+            for(ListMatchCase::iterator it = list_case->begin(); it != list_case->end(); it ++){
+                (*it)->accept(this);
+            }
+            exitVisit();
+        }
+
+        void visitMatchCase(AMatchCase *match_case)
+        {
+            enterVisit();
+            logMessage("visitAMatchCase; expected_type: " + toString(expected_type));
+            
+            exitVisit();
+        }
+
         void visitIf(If *if_)
         {
             enterVisit();
-            logMessage("visitIf");
+            logMessage("visitIf; expected_type: " + toString(expected_type));
             typecheck_subexpr(if_->expr_1, new TypeBool());
             logMessage("+-------------------------");
-            typecheck_subexpr(if_->expr_2, expected_type);
+            auto expr2_type = typecheck_subexpr(if_->expr_2, expected_type);
             logMessage("+-------------------------");
-            typecheck_subexpr(if_->expr_3, expected_type);
+            typecheck_subexpr(if_->expr_3, expr2_type);
             exitVisit();
         }
 
@@ -264,7 +336,8 @@ namespace Stella
         {
             enterVisit();
             logMessage("visitApplication; expected_type: " + toString(expected_type));
-            auto expr_type = typecheck_subexpr(application->expr_, nullptr);
+            auto expr = application->expr_;
+            auto expr_type = typecheck_subexpr(expr, nullptr);
             if(auto type_fun = dynamic_cast<TypeFun*>(expr_type)){
                 auto list_expr = application->listexpr_;
                 auto list_type = type_fun->listtype_;
@@ -286,7 +359,7 @@ namespace Stella
             }
             else{
                 throw TypeError(
-                    "Expected function type but got " + toString(expr_type) + " type", application->line_number, application->char_number
+                    "Expected function type but got " + toString(expr_type) + " type", expr->line_number, expr->char_number
                 );
             }
             exitVisit();
@@ -354,3 +427,21 @@ namespace Stella
         }
     }
 }
+
+/*
+language core;
+extend with #tuples;
+
+fn noop(_ : {}) -> {} {
+  return {}
+}
+
+fn third(tup : {Nat, Nat, Nat}) -> Nat {
+  return tup.4
+}
+
+fn main(n : Nat) -> Nat {
+  return third({n, succ(n), succ(succ(n))})
+}
+
+*/

@@ -1,0 +1,9 @@
+language core;
+
+fn cmp_fn(n : Nat, m : Bool) -> Nat {
+    return if (n >= m) then 0 else succ(0);
+}
+
+fn main(n : Nat) -> Nat {
+  return cmp_fn(n, true);
+}

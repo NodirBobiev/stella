@@ -1,0 +1,9 @@
+language core;
+
+fn not_fn(m : Nat) -> Bool {
+    return not (n);
+}
+
+fn main(n : Nat) -> Bool {
+  return not_fn(n);
+}

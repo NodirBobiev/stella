@@ -1,0 +1,10 @@
+language core;
+
+fn Bool::not(b : Bool) -> Bool {
+  return
+    if b then false else true ;
+}
+
+fn main() -> Bool {
+  return Bool::not(true);
+}
