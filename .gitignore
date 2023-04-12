@@ -1,0 +1,6 @@
+*.bak
+build/
+*.o
+.DS_Store
+TestStella
+Interpret
