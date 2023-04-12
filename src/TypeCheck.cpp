@@ -12,80 +12,89 @@ using namespace std;
 
 namespace Stella
 {
-
-    string toString(Type *type);
-
-    string toString(TypeBool *type_bool)
-    {
-        return "Bool";
-    }
-
-    string toString(TypeNat *type_nat)
-    {
-        return "Nat";
-    }
-
-    string toString(ListType *list_type)
-    {
-        string result = "";
-        bool is_first_param = true;
-        for (ListType::iterator i = list_type->begin(); i != list_type->end(); ++i)
-        {
-            result += (is_first_param ? "" : ",") + toString(*i);
-            is_first_param = false;
-        }
-        return result;
-    }
-
-    string toString(TypeFun *type_fun)
-    {
-        string result = "";
-        result += "(";                           // start of parameter types
-        result += toString(type_fun->listtype_); // parameters types
-        result += ")";                           // end of parameter types
-        result += "->(";                         // start of return type
-        result += toString(type_fun->type_);     // return type
-        result += ")";
-        return result;
-    }
-
     string toString(Type *type)
     {
         if (type == nullptr)
-        {
             return "NULLPTRTYPE";
-        }
+
         if (auto *type_bool = dynamic_cast<TypeBool *>(type))
-        {
-            return toString(type_bool);
-        }
+            return "Bool";
+    
         if (auto type_nat = dynamic_cast<TypeNat *>(type))
-        {
-            return toString(type_nat);
-        }
-        if (auto type_fun = dynamic_cast<TypeFun *>(type))
-        {
-            return toString(type_fun);
+            return "Nat";
+        
+        if (auto type_fun = dynamic_cast<TypeFun *>(type)){
+            // example: (Nat,Bool)->(Nat)
+            string result = "(";                
+            for (ListType::iterator it = type_fun->listtype_->begin(); it != type_fun->listtype_->end(); it++)
+                result +=  (it == type_fun->listtype_->begin() ? "" : ",") + toString(*it);
+            result += ")->(" + toString(type_fun->type_) + ")";
+            return result;
         }
         throw invalid_argument("Type is not implemented");
     }
+
 
     TypeFun *extractType(DeclFun *decl_fun)
     {
         auto list_param_decl = decl_fun->listparamdecl_;
         auto return_type = decl_fun->returntype_;
         auto list_type = new ListType();
-        for (ListParamDecl::iterator i = list_param_decl->begin(); i != list_param_decl->end(); i++)
-        {
+        for (ListParamDecl::iterator i = list_param_decl->begin(); i != list_param_decl->end(); i++){
             list_type->push_back(dynamic_cast<AParamDecl *>(*i)->type_);
         }
         Type *type = nullptr;
-        if (auto some_return_type = dynamic_cast<SomeReturnType *>(return_type))
-        {
+        if (auto some_return_type = dynamic_cast<SomeReturnType *>(return_type)){
             type = some_return_type->type_;
         }
         return new TypeFun(list_type, type);
     }
+
+    bool typecheck(Type *type1, Type *type2)
+    {
+        auto type1_bool = dynamic_cast<TypeBool *>(type1);
+        auto type2_bool = dynamic_cast<TypeBool *>(type2);
+        if (type1_bool != nullptr && type2_bool != nullptr)
+            return true;
+
+        auto type1_nat = dynamic_cast<TypeNat *>(type1);
+        auto type2_nat = dynamic_cast<TypeNat *>(type2);
+        if (type1_nat != nullptr && type2_nat != nullptr)
+            return true;
+
+        auto type1_fun = dynamic_cast<TypeFun*>(type1);
+        auto type2_fun = dynamic_cast<TypeFun*>(type2);
+        if (type1_fun != nullptr && type2_fun != nullptr){
+            auto list_type1 = type1_fun->listtype_;
+            auto list_type2 = type2_fun->listtype_;
+            if( list_type1->size() != list_type2->size() )
+                return false;
+            for(int i = 0; i < list_type1->size(); i ++)
+                if( !typecheck((*list_type1)[i], (*list_type2)[i]))
+                    return false;
+            
+            return typecheck(type1_fun->type_, type2_fun->type_);
+        }
+        return false;
+    }
+
+    string colorize(string text, int code)
+    {
+        return "\033[1;" + to_string(30 + code % 8) + "m" + text + "\033[1;0m";
+    }
+
+    string putTab(int cnt)
+    {
+        string res = "";
+        for (int i = 1; i < cnt; i++)
+            res += colorize("| ", i);
+        return res;
+    }
+    string beautify(string text, int depth)
+    {
+        return putTab(depth) + colorize(text, depth);
+    }
+
 
     class TypeError: public exception
     {
@@ -104,6 +113,7 @@ namespace Stella
             const char* what() const noexcept override{return msg.c_str();}
     };
 
+
     class UndefinedError: public exception
     {
         private:
@@ -117,6 +127,7 @@ namespace Stella
             const char* what() const noexcept override{return msg.c_str();}
     };
 
+
     class VisitTypeCheck : public Skeleton
     {
     public:
@@ -127,23 +138,6 @@ namespace Stella
         Type *expected_type = nullptr;
         Type *actual_type = nullptr;
         int visitDepth = 0;
-
-        string colorize(string text, int code)
-        {
-            return "\033[1;" + to_string(30 + code % 8) + "m" + text + "\033[1;0m";
-        }
-
-        string putTab(int cnt)
-        {
-            string res = "";
-            for (int i = 1; i < cnt; i++)
-                res += colorize("| ", i);
-            return res;
-        }
-        string beautify(string text, int depth)
-        {
-            return putTab(depth) + colorize(text, depth);
-        }
 
         void enterVisit() { this->visitDepth++; }
         void exitVisit() { this->visitDepth--; }
@@ -169,34 +163,6 @@ namespace Stella
         void exit_scope(unordered_map<StellaIdent, Type *> old_context)
         {
             context = old_context;
-        }
-
-        bool typecheck(Type *type1, Type *type2)
-        {
-            auto type1_bool = dynamic_cast<TypeBool *>(type1);
-            auto type2_bool = dynamic_cast<TypeBool *>(type2);
-            if (type1_bool != nullptr && type2_bool != nullptr)
-                return true;
-
-            auto type1_nat = dynamic_cast<TypeNat *>(type1);
-            auto type2_nat = dynamic_cast<TypeNat *>(type2);
-            if (type1_nat != nullptr && type2_nat != nullptr)
-                return true;
-
-            auto type1_fun = dynamic_cast<TypeFun*>(type1);
-            auto type2_fun = dynamic_cast<TypeFun*>(type2);
-            if (type1_fun != nullptr && type2_fun != nullptr){
-                auto list_type1 = type1_fun->listtype_;
-                auto list_type2 = type2_fun->listtype_;
-                if( list_type1->size() != list_type2->size() )
-                    return false;
-                for(int i = 0; i < list_type1->size(); i ++)
-                    if( !typecheck((*list_type1)[i], (*list_type2)[i]))
-                        return false;
-                
-                return typecheck(type1_fun->type_, type2_fun->type_);
-            }
-            return false;
         }
 
         void set_actual_type(Expr *expr, Type *type)
@@ -275,7 +241,7 @@ namespace Stella
         void visitVar(Var *var)
         {
             enterVisit();
-            logMessage("visitVar: " + var->stellaident_);
+            logMessage("visitVar: " + var->stellaident_ + "; expected_type: " + toString(expected_type));
             if(context.find(var->stellaident_) == context.end())
                 throw UndefinedError(var->stellaident_, var->line_number, var->char_number);
             set_actual_type(var, context[var->stellaident_]);
@@ -376,15 +342,15 @@ namespace Stella
             program->accept(visitTypeCheck);
             cout << visitTypeCheck->message_outputs << endl;
 
-            cout << "\033[1;32mSuccess!!!\033[1;0m\n" << endl;
+            cout << colorize("Success!!!", 2) << endl << endl;
         }
         catch(TypeError& e){
+            cout << endl << colorize(e.what(), 1) << endl << endl;
             exit(1);
         }
         catch(UndefinedError& e){
+            cout << endl << colorize(e.what(), 1) << endl << endl;
             exit(1);
         }
-
     }
-
 }
