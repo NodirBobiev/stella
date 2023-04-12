@@ -36,7 +36,7 @@ namespace Stella
         }
         return result;
     }
-    
+
     string toString(TypeFun *type_fun)
     {
         string result = "";
@@ -372,11 +372,19 @@ namespace Stella
     {
         auto visitTypeCheck = new VisitTypeCheck();
 
-        program->accept(visitTypeCheck);
+        try{
+            program->accept(visitTypeCheck);
+            cout << visitTypeCheck->message_outputs << endl;
 
-        cout << visitTypeCheck->message_outputs << endl;
+            cout << "\033[1;32mSuccess!!!\033[1;0m\n" << endl;
+        }
+        catch(TypeError& e){
+            exit(1);
+        }
+        catch(UndefinedError& e){
+            exit(1);
+        }
 
-        cout << "\033[1;32mSuccess!!!\033[1;0m\n" << endl;
     }
 
 }
