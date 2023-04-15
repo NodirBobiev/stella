@@ -43,11 +43,10 @@ namespace Stella
             return "(" + toString(type_fun->listtype_) + ")->(" + toString(type_fun->type_) + ")";
         
         if (auto type_sum = dynamic_cast<TypeSum *>(type))
-            return toString(type_sum->type_1) + "+" + toString(type_sum->type_2);
+            return "(" + toString(type_sum->type_1) + "+" + toString(type_sum->type_2) + ")";
 
         throw invalid_argument("Type is not implemented");
     }
-
 
     TypeFun *extractType(DeclFun *decl_fun)
     {
@@ -86,12 +85,16 @@ namespace Stella
         return putTab(depth) + colorize(text, depth);
     }
 
-
     class TypeError: public exception
     {
         private:
             string msg;
         public:
+            TypeError(Type* e_type, Type* a_type, int r, int c)
+                :msg(
+                    "TypeError (" + to_string(r) + ", " + to_string(c) + "): " + 
+                    "Expected " + toString(e_type) + " type but got " + toString(a_type) + " type."
+                ){}
             TypeError(string e_type, string a_type, int r, int c)
                 :msg(
                     "TypeError (" + to_string(r) + ", " + to_string(c) + "): " + 
@@ -128,6 +131,7 @@ namespace Stella
         unordered_map<StellaIdent, Type *> context = {};
         Type *expected_type = nullptr;
         Type *actual_type = nullptr;
+        Type *match_type = nullptr;
         int visitDepth = 0;
 
         void enterVisit() { this->visitDepth++; }
@@ -171,6 +175,14 @@ namespace Stella
             expr->accept(this);
             expected_type = old_expected_type;
             return actual_type;
+        }
+
+        void typecheck_pattern(Pattern *pattern, Type *type)
+        {
+            Type *old_match_type = match_type;
+            match_type = type;
+            pattern->accept(this);
+            match_type = old_match_type; 
         }
 
         void visitSucc(Succ *succ)
@@ -285,9 +297,13 @@ namespace Stella
         void visitInl(Inl *inl)
         {
             enterVisit();
-            logMessage("visitInl; exptected_type: " + toString(expected_type));
-
-
+            logMessage("visitInl; expected_type: " + toString(expected_type));
+            if(auto type_sum=dynamic_cast<TypeSum*>(expected_type)){
+                actual_type = typecheck_subexpr(inl->expr_, type_sum->type_1);
+            }
+            else{
+                throw TypeError(toString(expected_type), "TypeSum", inl->line_number, inl->char_number);
+            }
             exitVisit();
         }
 
@@ -295,28 +311,57 @@ namespace Stella
         {
             enterVisit();
             logMessage("visitInr; expected_type: " + toString(expected_type));
+            if(auto type_sum=dynamic_cast<TypeSum*>(expected_type)){
+                actual_type = typecheck_subexpr(inr->expr_, type_sum->type_2);
+            }
+            else{
+                throw TypeError(toString(expected_type), "TypeSum", inr->line_number, inr->char_number);
+            }
+            exitVisit();
+        }
 
+        void visitPatternInl(PatternInl *pattern_inl)
+        {
+            enterVisit();
+            logMessage("PatternInl; match_type:" + toString(match_type) + ";  expected_type: " + toString(expected_type));
+            if(auto type_sum = dynamic_cast<TypeSum *>(match_type))
+                typecheck_pattern(pattern_inl->pattern_, type_sum->type_1);
+            else
+                throw TypeError("PatternInr requires TypeSum in match case", pattern_inl->line_number, pattern_inl->char_number);
+            exitVisit();
+        }
+
+        void visitPatternInr(PatternInr *pattern_inr)
+        {
+            enterVisit();
+            logMessage("PatternInr; match_type:" + toString(match_type) + ";  expected_type: " + toString(expected_type));
+            if(auto type_sum = dynamic_cast<TypeSum *>(match_type))
+                typecheck_pattern(pattern_inr->pattern_, type_sum->type_2);
+            else
+                throw TypeError("PatternInr requires TypeSum in match case", pattern_inr->line_number, pattern_inr->char_number);
+            exitVisit();
+        }
+        
+        void visitPatternVar(PatternVar *pattern_var)
+        {
+            enterVisit();
+            logMessage("PatternVar: " + pattern_var->stellaident_ + "; match_type:" + toString(match_type) + ";  expected_type: " + toString(expected_type));
+            context[pattern_var->stellaident_] = match_type;
             exitVisit();
         }
 
         void visitMatch(Match *match)
         {
             enterVisit();
-            logMessage("visitMatch; expected_type: " + toString(expected_type));
-            typecheck_subexpr(match->expr_, nullptr);
+            logMessage("visitMatch; list_match_case_size: " + to_string(match->listmatchcase_->size()) + ";expected_type: " + toString(expected_type));
+            auto expr_type = typecheck_subexpr(match->expr_, nullptr);
             auto list_case = match->listmatchcase_;
-
-            for(ListMatchCase::iterator it = list_case->begin(); it != list_case->end(); it ++){
-                (*it)->accept(this);
-            }
-            exitVisit();
-        }
-
-        void visitMatchCase(AMatchCase *match_case)
-        {
-            enterVisit();
-            logMessage("visitAMatchCase; expected_type: " + toString(expected_type));
             
+            for(ListMatchCase::iterator it = list_case->begin(); it != list_case->end(); it ++){
+                auto a_match_case = dynamic_cast<AMatchCase*>(*it);
+                typecheck_pattern(a_match_case->pattern_, expr_type);
+                typecheck_subexpr(a_match_case->expr_, expected_type);
+            }
             exitVisit();
         }
 
@@ -328,7 +373,14 @@ namespace Stella
             logMessage("+-------------------------");
             auto expr2_type = typecheck_subexpr(if_->expr_2, expected_type);
             logMessage("+-------------------------");
-            typecheck_subexpr(if_->expr_3, expr2_type);
+            if( expected_type == nullptr ){
+                typecheck_subexpr(if_->expr_3, expr2_type);
+                set_actual_type(if_, expr2_type);
+            }
+            else{
+                typecheck_subexpr(if_->expr_3, expected_type);
+                set_actual_type(if_, expected_type);
+            }
             exitVisit();
         }
 
@@ -370,13 +422,37 @@ namespace Stella
             enterVisit();
             logMessage("visitAbstraction; expected_type: " + toString(expected_type));
             auto old_context = enter_scope(abstraction->listparamdecl_);
-
-            auto list_type = new ListType();
-            auto list_param = abstraction->listparamdecl_;
-            for(ListParamDecl::iterator it = list_param->begin(); it != list_param->end(); it ++ )
-                list_type->push_back(dynamic_cast<AParamDecl*>(*it)->type_);
-            auto expr_type = typecheck_subexpr(abstraction->expr_, nullptr);
-            set_actual_type(abstraction, new TypeFun(list_type, expr_type));
+            if(!expected_type){
+                auto lt = new ListType();
+                auto lp = abstraction->listparamdecl_;
+                for(ListParamDecl::iterator it = lp->begin(); it != lp->end(); it ++ )
+                    lt->push_back(dynamic_cast<AParamDecl*>(*it)->type_);
+                auto expr_type = typecheck_subexpr(abstraction->expr_, nullptr);
+                set_actual_type(abstraction, new TypeFun(lt, expr_type));
+            }
+            else if(auto type_fun=dynamic_cast<TypeFun*>(expected_type)){
+                auto lp = abstraction->listparamdecl_;
+                auto lt = type_fun->listtype_;
+                if(lp->size() != lt->size()){
+                    throw TypeError(
+                        "Expected function type requires " + to_string(lt->size()) + " arguments but anonymous functions has " + to_string(lp->size()),
+                        abstraction->line_number, abstraction->char_number
+                    );
+                }
+                for(int i = 0; i < lp->size(); i ++){
+                    auto p = dynamic_cast<AParamDecl*>(lp->at(i));
+                    if(!typecheck(lt->at(i), p->type_))
+                        throw TypeError(lt->at(i), p->type_, p->line_number, p->char_number);
+                }
+                typecheck_subexpr(abstraction->expr_, type_fun->type_);
+                set_actual_type(abstraction, expected_type);
+            }
+            else{
+                throw TypeError(
+                    "Expected " + toString(expected_type) + " type but got anonymous function",
+                    abstraction->line_number, abstraction->char_number
+                );
+            }
 
             exit_scope(old_context);
             exitVisit();
@@ -443,5 +519,55 @@ fn third(tup : {Nat, Nat, Nat}) -> Nat {
 fn main(n : Nat) -> Nat {
   return third({n, succ(n), succ(succ(n))})
 }
+
+
+language core;
+
+extend with #sum-types, #unit-type;
+
+fn test(first : Bool) -> fn (Nat) -> Nat + Unit {
+  return fn(n : Nat){ return if first then inl(succ(0)) else inr(unit) }
+}
+
+
+
+language core;
+extend with #sum-types, #structural-patterns;
+
+fn main(input : Nat + (Bool + (fn (Nat) -> Nat))) -> Nat {
+  return match input {
+        inl(number) => number
+      | inr(inl(false)) => 0
+      | inr(inl(true)) => succ(0)
+      | inr(inr(fun)) => fun(0)(1)
+   }
+}
+
+
+language core;
+extend with #sum-types;
+
+fn g(x : Nat + (Bool + (fn(Nat) -> Nat))) -> Nat {
+  return match x {
+      inl(n) => succ(n)
+    | inr(bf) => match bf {
+          inl(b) => if b then succ(0) else 0
+        | inr(f) => f(f(succ(0)))
+      }
+  }
+}
+
+fn main(x : Nat) -> Nat {
+  return g(inr(inr(fn(n : Nat) { return g(inl(n)) })))
+}
+
+
+
+language core;
+extend with #sum-types;
+
+
+
+
 
 */

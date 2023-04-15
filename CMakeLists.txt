@@ -52,8 +52,8 @@ add_test(NAME bad-succ-3.stella COMMAND stella-interpreter typecheck ../tests/il
 add_test(NAME shadowed-variable-1.stella COMMAND stella-interpreter typecheck ../tests/ill-typed/shadowed-variable-1.stella)
 add_test(NAME undefined-variable-1.stella COMMAND stella-interpreter typecheck ../tests/ill-typed/undefined-variable-1.stella)
 add_test(NAME undefined-variable-2.stella COMMAND stella-interpreter typecheck ../tests/ill-typed/undefined-variable-2.stella)
-# add_test(NAME ill-typed-1.stella COMMAND stella-interpreter typecheck ../tests/ill-typed/ill-typed-1.stella)
-# add_test(NAME ill-typed-2.stella COMMAND stella-interpreter typecheck ../tests/ill-typed/ill-typed-2.stella)
+add_test(NAME ill-typed-1.stella COMMAND stella-interpreter typecheck ../tests/ill-typed/ill-typed-1.stella)
+add_test(NAME ill-typed-2.stella COMMAND stella-interpreter typecheck ../tests/ill-typed/ill-typed-2.stella)
 set_tests_properties(
         applying-non-function-1.stella
         applying-non-function-2.stella
@@ -71,8 +71,8 @@ set_tests_properties(
         shadowed-variable-1.stella
         undefined-variable-1.stella
         undefined-variable-2.stella
-        # ill-typed-1.stella
-        # ill-typed-2.stella
+        ill-typed-1.stella
+        ill-typed-2.stella
         PROPERTIES WILL_FAIL TRUE)
 
 add_test(NAME factorial.stella COMMAND stella-interpreter typecheck ../tests/well-typed/factorial.stella)
@@ -80,8 +80,8 @@ add_test(NAME higher-order-1.stella COMMAND stella-interpreter typecheck ../test
 add_test(NAME increment_twice.stella COMMAND stella-interpreter typecheck ../tests/well-typed/increment_twice.stella)
 add_test(NAME logical-operators.stella COMMAND stella-interpreter typecheck ../tests/well-typed/logical-operators.stella)
 add_test(NAME squares.stella COMMAND stella-interpreter typecheck ../tests/well-typed/squares.stella)
-# add_test(NAME well-typed-1.stella COMMAND stella-interpreter typecheck ../tests/well-typed/well-typed-1.stella)
-# add_test(NAME well-typed-2.stella COMMAND stella-interpreter typecheck ../tests/well-typed/well-typed-2.stella)
+add_test(NAME well-typed-1.stella COMMAND stella-interpreter typecheck ../tests/well-typed/well-typed-1.stella)
+add_test(NAME well-typed-2.stella COMMAND stella-interpreter typecheck ../tests/well-typed/well-typed-2.stella)
 
 
 add_test(NAME 1-added-test-1.stella COMMAND stella-interpreter typecheck ../extended_tests/ill-typed/added-test-1.stella)
